@@ -304,6 +304,14 @@
             border-color: rgba(34, 197, 94, 0.8);
             color: #22c55e;
         }
+
+        .map-container {
+            display: none;
+        }
+
+        .map-container.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -400,9 +408,9 @@
             const [activeTab, setActiveTab] = useState('map');
             const mapRef = useRef(null);
 
-            // Initialize Google Map
+            // Initialize Google Map when map tab is active
             useEffect(() => {
-                if (mapRef.current && !map) {
+                if (activeTab === 'map' && mapRef.current && !map) {
                     const newMap = new window.google.maps.Map(mapRef.current, {
                         center: { lat: -7.606145, lng: 15.054881 },
                         zoom: 14,
@@ -432,7 +440,17 @@
                     });
                     setMap(newMap);
                 }
-            }, []);
+            }, [activeTab, map]);
+
+            // Resize map when tab changes to map to ensure proper rendering
+            useEffect(() => {
+                if (activeTab === 'map' && map) {
+                    window.google.maps.event.trigger(map, 'resize');
+                    if (location) {
+                        map.setCenter({ lat: location.lat, lng: location.lng });
+                    }
+                }
+            }, [activeTab, map, location]);
 
             // Get location name using Google Geocoding
             const getLocationName = (lat, lng) => {
@@ -602,7 +620,7 @@
 
             // Add markers for cases
             useEffect(() => {
-                if (!map) return;
+                if (!map || activeTab !== 'map') return;
                 
                 const caseMarkers = cases.map(caso => {
                     return new window.google.maps.Marker({
@@ -623,7 +641,7 @@
                 return () => {
                     caseMarkers.forEach(marker => marker.setMap(null));
                 };
-            }, [map, cases]);
+            }, [map, cases, activeTab]);
 
             const getStatusColor = (status) => {
                 switch (status) {
@@ -761,23 +779,21 @@
                     </div>
 
                     {/* Content Sections */}
-                    {activeTab === 'map' && (
-                        <div className="sensor-panel rounded-2xl p-4 slide-up">
-                            <div className="flex items-center justify-between mb-3">
-                                <h2 className="text-lg font-bold flex items-center gap-2">
-                                    <MapIcon className="glow-blue" />
-                                    MAPA DE CASOS
-                                </h2>
-                                <div className="coords-display">
-                                    {location ? `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}` : '---, ---'}
-                                </div>
-                            </div>
-                            <div id="map" ref={mapRef}></div>
-                            <div className="mt-2 text-xs text-slate-400">
-                                {locationName || 'Carregando localização...'}
+                    <div className={`sensor-panel rounded-2xl p-4 slide-up map-container ${activeTab === 'map' ? 'active' : ''}`}>
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-lg font-bold flex items-center gap-2">
+                                <MapIcon className="glow-blue" />
+                                MAPA DE CASOS
+                            </h2>
+                            <div className="coords-display">
+                                {location ? `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}` : '---, ---'}
                             </div>
                         </div>
-                    )}
+                        <div id="map" ref={mapRef}></div>
+                        <div className="mt-2 text-xs text-slate-400">
+                            {locationName || 'Carregando localização...'}
+                        </div>
+                    </div>
 
                     {activeTab === 'tracking' && (
                         <div className="sensor-panel rounded-2xl p-4 slide-up">

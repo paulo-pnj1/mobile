@@ -390,7 +390,8 @@
 
         const ColeraTracker = () => {
             const [map, setMap] = useState(null);
-            const [markers, setMarkers] = useState([]);
+            const [currentMarker, setCurrentMarker] = useState(null);
+            const [currentCircle, setCurrentCircle] = useState(null);
             const [cases, setCases] = useState([]);
             const [location, setLocation] = useState(null);
             const [locationName, setLocationName] = useState('');
@@ -466,49 +467,56 @@
 
             // Handle position changes
             const handlePositionChange = (position) => {
-                if (!map) return;
+                if (!map || !isTracking) return;
                 
                 const pos = {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude
                 };
                 
-                // Center map on new position
-                map.setCenter(pos);
+                // Smoothly pan map to new position
+                map.panTo(pos);
                 
-                // Add marker for current location
-                const marker = new window.google.maps.Marker({
-                    position: pos,
-                    map: map,
-                    title: "Sensor Ativo",
-                    icon: {
-                        path: window.google.maps.SymbolPath.CIRCLE,
-                        scale: 10,
+                // Update or create current location marker
+                if (currentMarker) {
+                    currentMarker.setPosition(pos);
+                } else {
+                    const marker = new window.google.maps.Marker({
+                        position: pos,
+                        map: map,
+                        title: "Sensor Ativo",
+                        icon: {
+                            path: window.google.maps.SymbolPath.CIRCLE,
+                            scale: 10,
+                            fillColor: "#22c55e",
+                            fillOpacity: 1,
+                            strokeWeight: 3,
+                            strokeColor: "#16a34a"
+                        }
+                    });
+                    setCurrentMarker(marker);
+                }
+                
+                // Update or create accuracy circle
+                if (currentCircle) {
+                    currentCircle.setCenter(pos);
+                    currentCircle.setRadius(position.coords.accuracy);
+                } else {
+                    const circle = new window.google.maps.Circle({
+                        strokeColor: "#22c55e",
+                        strokeOpacity: 0.8,
+                        strokeWeight: 2,
                         fillColor: "#22c55e",
-                        fillOpacity: 1,
-                        strokeWeight: 3,
-                        strokeColor: "#16a34a"
-                    }
-                });
-                
-                // Add accuracy circle
-                new window.google.maps.Circle({
-                    strokeColor: "#22c55e",
-                    strokeOpacity: 0.8,
-                    strokeWeight: 2,
-                    fillColor: "#22c55e",
-                    fillOpacity: 0.1,
-                    map: map,
-                    center: pos,
-                    radius: position.coords.accuracy
-                });
+                        fillOpacity: 0.1,
+                        map: map,
+                        center: pos,
+                        radius: position.coords.accuracy
+                    });
+                    setCurrentCircle(circle);
+                }
                 
                 // Get location name
                 getLocationName(pos.lat, pos.lng);
-                
-                // Clear old markers
-                markers.forEach(m => m.setMap(null));
-                setMarkers([marker]);
                 
                 // Update location state
                 setLocation({
@@ -546,7 +554,7 @@
                             setError(errorMessage);
                             setStatus('SISTEMA EM FALHA');
                         },
-                        { enableHighAccuracy: true }
+                        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
                     );
                     setWatchId(id);
                     setIsTracking(true);
@@ -560,6 +568,15 @@
                 }
                 setIsTracking(false);
                 setStatus('RASTREAMENTO DESATIVADO');
+                // Clear current marker and circle
+                if (currentMarker) {
+                    currentMarker.setMap(null);
+                    setCurrentMarker(null);
+                }
+                if (currentCircle) {
+                    currentCircle.setMap(null);
+                    setCurrentCircle(null);
+                }
             };
 
             // Get current location once
